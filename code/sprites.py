@@ -5,7 +5,7 @@ from random import choice, randint
 class BG(pygame.sprite.Sprite):
 	def __init__(self,groups,scale_factor):
 		super().__init__(groups)
-		bg_image = pygame.image.load('../graphics/environment/background.bmp').convert()
+		bg_image = pygame.image.load('../graphics/environment/background.png').convert()
 
 		full_height = bg_image.get_height() * scale_factor
 		full_width = bg_image.get_width() * scale_factor
@@ -30,7 +30,7 @@ class Ground(pygame.sprite.Sprite):
 		self.sprite_type = 'ground'
 		
 		# image
-		ground_surf = pygame.image.load('../graphics/environment/ground.bmp').convert_alpha()
+		ground_surf = pygame.image.load('../graphics/environment/ground.png').convert_alpha()
 		self.image = pygame.transform.scale(ground_surf,pygame.math.Vector2(ground_surf.get_size()) * scale_factor)
 		
 		# position
@@ -77,7 +77,7 @@ class Plane(pygame.sprite.Sprite):
 	def import_frames(self,scale_factor):
 		self.frames = []
 		for i in range(3):
-			surf = pygame.image.load(f'../graphics/plane/red{i}.bmp').convert_alpha()
+			surf = pygame.image.load(f'../graphics/plane/red{i}.png').convert_alpha()
 			scaled_surface = pygame.transform.scale(surf,pygame.math.Vector2(surf.get_size())* scale_factor)
 			self.frames.append(scaled_surface)
 
@@ -108,47 +108,29 @@ class Plane(pygame.sprite.Sprite):
 		self.rotate()
 
 class Pipe(pygame.sprite.Sprite):
-	def __init__(self,groups,scale_factor):
+	"""Bottom pipe. Always spawns a matching top pipe (PipePartner)."""
+	def __init__(self, groups, scale_factor, x_start=None):
 		super().__init__(groups)
 		self.sprite_type = 'obstacle'
-		
-		# Get pipe image
-		surf = pygame.image.load(f'../graphics/obstacles/{choice((0,1))}.bmp').convert_alpha()
-		
-		# Random gap position (height where bird can pass through)
-		gap_y = randint(int(WINDOW_HEIGHT * 0.3), int(WINDOW_HEIGHT * 0.7))
-		self.gap_height = 150  # Fixed gap size
+
+		surf = pygame.image.load(f'../graphics/obstacles/{choice((0,1))}.png').convert_alpha()
+
+		gap_y = randint(int(WINDOW_HEIGHT * 0.4), int(WINDOW_HEIGHT * 0.6))
+		self.gap_height = 250
 		self.gap_y = gap_y
-		
-		# Determine if this is top or bottom pipe
-		self.is_top = choice([True, False])
-		
-		# Create scaled image
+
 		self.image = pygame.transform.scale(surf, pygame.math.Vector2(surf.get_size()) * scale_factor)
-		
-		# Position (starting off-screen to the right)
-		x = WINDOW_WIDTH + 50
-		
-		if self.is_top:
-			# Top pipe: bottom of pipe is at gap_y - gap_height/2
-			y = gap_y - self.gap_height // 2
-			self.rect = self.image.get_rect(midbottom = (x, y))
-		else:
-			# Bottom pipe: top of pipe is at gap_y + gap_height/2
-			y = gap_y + self.gap_height // 2
-			self.image = pygame.transform.flip(self.image, False, True)
-			self.rect = self.image.get_rect(midtop = (x, y))
-		
+		self.image = pygame.transform.flip(self.image, False, True)
+
+		x = x_start if x_start is not None else WINDOW_WIDTH + 50
+		y = gap_y + self.gap_height // 2
+		self.rect = self.image.get_rect(midtop=(x, y))
 		self.pos = pygame.math.Vector2(self.rect.topleft)
-		
-		# Mask for collision detection
 		self.mask = pygame.mask.from_surface(self.image)
-		
-		# Create the matching pipe (top if this is bottom, bottom if this is top)
-		# by creating a new Pipe in the same groups
-		if not self.is_top:  # Only create partner if this is a bottom pipe
-			PipePartner(groups, scale_factor, gap_y, self.gap_height)
-	
+
+		# Always spawn the matching top pipe
+		PipePartner(groups, scale_factor, gap_y, self.gap_height, x_start=x)
+
 	def update(self, dt):
 		self.pos.x -= 400 * dt
 		self.rect.x = round(self.pos.x)
@@ -157,31 +139,23 @@ class Pipe(pygame.sprite.Sprite):
 
 
 class PipePartner(pygame.sprite.Sprite):
-	"""Partner pipe (top) created automatically when a bottom pipe is created"""
-	def __init__(self, groups, scale_factor, gap_y, gap_height):
+	"""Top pipe, always paired with a Pipe."""
+	def __init__(self, groups, scale_factor, gap_y, gap_height, x_start=None):
 		super().__init__(groups)
 		self.sprite_type = 'obstacle'
-		self.is_partner = True
-		
-		# Get pipe image
-		surf = pygame.image.load(f'../graphics/obstacles/{choice((0,1))}.bmp').convert_alpha()
-		
-		# Create scaled image
+
+		surf = pygame.image.load(f'../graphics/obstacles/{choice((0,1))}.png').convert_alpha()
 		self.image = pygame.transform.scale(surf, pygame.math.Vector2(surf.get_size()) * scale_factor)
-		
-		# Position (starting off-screen to the right)
-		x = WINDOW_WIDTH + 50
+
+		x = x_start if x_start is not None else WINDOW_WIDTH + 50
 		y = gap_y - gap_height // 2
-		self.rect = self.image.get_rect(midbottom = (x, y))
-		
+		self.rect = self.image.get_rect(midbottom=(x, y))
 		self.pos = pygame.math.Vector2(self.rect.topleft)
-		
-		# Mask for collision detection
 		self.mask = pygame.mask.from_surface(self.image)
-		
+
 		self.gap_y = gap_y
 		self.gap_height = gap_height
-	
+
 	def update(self, dt):
 		self.pos.x -= 400 * dt
 		self.rect.x = round(self.pos.x)
@@ -195,7 +169,7 @@ class Obstacle(pygame.sprite.Sprite):
 		self.sprite_type = 'obstacle'
 
 		orientation = choice(('up','down'))
-		surf = pygame.image.load(f'../graphics/obstacles/{choice((0,1))}.bmp').convert_alpha()
+		surf = pygame.image.load(f'../graphics/obstacles/{choice((0,1))}.png').convert_alpha()
 		self.image = pygame.transform.scale(surf,pygame.math.Vector2(surf.get_size()) * scale_factor)
 		
 		x = WINDOW_WIDTH + randint(40,100)
