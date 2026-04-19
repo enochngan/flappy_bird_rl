@@ -5,21 +5,22 @@ from random import choice, randint
 class BG(pygame.sprite.Sprite):
 	def __init__(self,groups,scale_factor):
 		super().__init__(groups)
-		bg_image = pygame.image.load('../graphics/environment/background.png').convert()
+		bg_image = pygame.image.load('../graphics/flappy_bird_sprites_fixed/background_day.png').convert()
 
-		full_height = bg_image.get_height() * scale_factor
-		full_width = bg_image.get_width() * scale_factor
-		full_sized_image = pygame.transform.scale(bg_image,(full_width,full_height))
-		
-		self.image = pygame.Surface((full_width * 2,full_height))
+		# Stretch background to fill the window dimensions for clean tiling
+		tile_w = WINDOW_WIDTH
+		tile_h = WINDOW_HEIGHT
+		full_sized_image = pygame.transform.scale(bg_image,(tile_w, tile_h))
+
+		self.image = pygame.Surface((tile_w * 2, tile_h))
 		self.image.blit(full_sized_image,(0,0))
-		self.image.blit(full_sized_image,(full_width,0))
+		self.image.blit(full_sized_image,(tile_w,0))
 
 		self.rect = self.image.get_rect(topleft = (0,0))
 		self.pos = pygame.math.Vector2(self.rect.topleft)
 
 	def update(self,dt):
-		self.pos.x -= 300 * dt
+		self.pos.x -= 180 * dt
 		if self.rect.centerx <= 0:
 			self.pos.x = 0
 		self.rect.x = round(self.pos.x)
@@ -41,7 +42,7 @@ class Ground(pygame.sprite.Sprite):
 		self.mask = pygame.mask.from_surface(self.image)
 
 	def update(self,dt):
-		self.pos.x -= 360 * dt
+		self.pos.x -= 220 * dt
 		if self.rect.centerx <= 0:
 			self.pos.x = 0
 
@@ -61,7 +62,7 @@ class Plane(pygame.sprite.Sprite):
 		self.pos = pygame.math.Vector2(self.rect.topleft)
 
 		# movement
-		self.gravity = 600
+		self.gravity = 1000
 		self.direction = 0
 
 		# mask
@@ -76,9 +77,9 @@ class Plane(pygame.sprite.Sprite):
 
 	def import_frames(self,scale_factor):
 		self.frames = []
-		for i in range(3):
-			surf = pygame.image.load(f'../graphics/plane/red{i}.png').convert_alpha()
-			scaled_surface = pygame.transform.scale(surf,pygame.math.Vector2(surf.get_size())* scale_factor)
+		surf = pygame.image.load('../graphics/flappy_bird_sprites_fixed/109939-logo-pic-bird-flappy-free-transparent-image-hq.png').convert_alpha()
+		scaled_surface = pygame.transform.scale(surf, (100, 65))
+		for _ in range(3):
 			self.frames.append(scaled_surface)
 
 	def apply_gravity(self,dt):
@@ -112,19 +113,22 @@ class Pipe(pygame.sprite.Sprite):
 	def __init__(self, groups, scale_factor, x_start=None):
 		super().__init__(groups)
 		self.sprite_type = 'obstacle'
+		self.counts_for_score = True   # only bottom pipe scores
 
-		surf = pygame.image.load(f'../graphics/obstacles/{choice((0,1))}.png').convert_alpha()
-
-		gap_y = randint(int(WINDOW_HEIGHT * 0.4), int(WINDOW_HEIGHT * 0.6))
+		gap_y = randint(int(WINDOW_HEIGHT * 0.25), int(WINDOW_HEIGHT * 0.75))
 		self.gap_height = 250
 		self.gap_y = gap_y
 
-		self.image = pygame.transform.scale(surf, pygame.math.Vector2(surf.get_size()) * scale_factor)
+		surf = pygame.image.load('../graphics/flappy_bird_sprites_fixed/pipe_green.png').convert_alpha()
+		pipe_w = 80
+		# Height: from gap edge all the way past the bottom of the screen
+		pipe_top_y = gap_y + self.gap_height // 2
+		pipe_h = WINDOW_HEIGHT - pipe_top_y + 60
+		self.image = pygame.transform.scale(surf, (pipe_w, pipe_h))
 		self.image = pygame.transform.flip(self.image, False, True)
 
 		x = x_start if x_start is not None else WINDOW_WIDTH + 50
-		y = gap_y + self.gap_height // 2
-		self.rect = self.image.get_rect(midtop=(x, y))
+		self.rect = self.image.get_rect(midtop=(x, pipe_top_y))
 		self.pos = pygame.math.Vector2(self.rect.topleft)
 		self.mask = pygame.mask.from_surface(self.image)
 
@@ -132,7 +136,7 @@ class Pipe(pygame.sprite.Sprite):
 		PipePartner(groups, scale_factor, gap_y, self.gap_height, x_start=x)
 
 	def update(self, dt):
-		self.pos.x -= 400 * dt
+		self.pos.x -= 240 * dt
 		self.rect.x = round(self.pos.x)
 		if self.rect.right <= -100:
 			self.kill()
@@ -143,13 +147,17 @@ class PipePartner(pygame.sprite.Sprite):
 	def __init__(self, groups, scale_factor, gap_y, gap_height, x_start=None):
 		super().__init__(groups)
 		self.sprite_type = 'obstacle'
+		self.counts_for_score = False  # top pipe never scores
 
-		surf = pygame.image.load(f'../graphics/obstacles/{choice((0,1))}.png').convert_alpha()
-		self.image = pygame.transform.scale(surf, pygame.math.Vector2(surf.get_size()) * scale_factor)
+		surf = pygame.image.load('../graphics/flappy_bird_sprites_fixed/pipe_green.png').convert_alpha()
+		pipe_w = 80
+		# Height: from gap edge all the way past the top of the screen
+		pipe_bottom_y = gap_y - gap_height // 2
+		pipe_h = pipe_bottom_y + 60
+		self.image = pygame.transform.scale(surf, (pipe_w, pipe_h))
 
 		x = x_start if x_start is not None else WINDOW_WIDTH + 50
-		y = gap_y - gap_height // 2
-		self.rect = self.image.get_rect(midbottom=(x, y))
+		self.rect = self.image.get_rect(midbottom=(x, pipe_bottom_y))
 		self.pos = pygame.math.Vector2(self.rect.topleft)
 		self.mask = pygame.mask.from_surface(self.image)
 
@@ -157,7 +165,7 @@ class PipePartner(pygame.sprite.Sprite):
 		self.gap_height = gap_height
 
 	def update(self, dt):
-		self.pos.x -= 400 * dt
+		self.pos.x -= 240 * dt
 		self.rect.x = round(self.pos.x)
 		if self.rect.right <= -100:
 			self.kill()

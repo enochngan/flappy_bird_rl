@@ -34,6 +34,7 @@ class FlappyBirdEnv(gym.Env):
         self.display_surface = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         pygame.display.set_caption("Flappy Bird - Q-Learning")
         self.clock = pygame.time.Clock()
+        self._hud_font = pygame.font.SysFont(None, 48)
 
         self.all_sprites = None
         self.collision_sprites = None
@@ -43,7 +44,7 @@ class FlappyBirdEnv(gym.Env):
         self.score = 0
         self.active = False
         self.frame_count = 0
-        self.steps_since_last_obstacle = 0
+        self.time_since_last_obstacle = 0.0
         self.pipes_cleared = 0        # how many pipe pairs the bird has passed
         self._pipe_xs_seen = set()    # tracks pipe x-positions already counted
 
@@ -57,18 +58,17 @@ class FlappyBirdEnv(gym.Env):
         self.all_sprites = pygame.sprite.Group()
         self.collision_sprites = pygame.sprite.Group()
 
-        bg_height = pygame.image.load('../graphics/environment/background.png').get_height()
-        self.scale_factor = WINDOW_HEIGHT / bg_height
+        # Use a fixed reference height so gameplay proportions stay consistent
+        # regardless of the background image's native resolution
+        self.scale_factor = WINDOW_HEIGHT / 480
 
         BG(self.all_sprites, self.scale_factor)
-        Ground([self.all_sprites, self.collision_sprites], self.scale_factor)
         self.plane = Plane(self.all_sprites, self.scale_factor / 1.7)
 
-        # Spawn first pipe already on-screen so the agent encounters it
-        # before dying (~step 65 arrival vs ~step 106 death without flapping)
+        # First pipe starts at the right edge — gives the bird time to react
         Pipe([self.all_sprites, self.collision_sprites], self.scale_factor * 1.1,
-             x_start=WINDOW_WIDTH // 2)
-        self.steps_since_last_obstacle = 0
+             x_start=WINDOW_WIDTH)
+        self.time_since_last_obstacle = 0.0
         self.pipes_cleared = 0
         self._pipe_xs_seen = set()
 
@@ -139,6 +139,8 @@ class FlappyBirdEnv(gym.Env):
             if hasattr(s, 'sprite_type') and s.sprite_type == 'obstacle'
         ]
         for obs in obstacles:
+            if not getattr(obs, 'counts_for_score', False):
+                continue
             key = id(obs)
             if obs.rect.right < self.plane.rect.centerx and key not in self._pipe_xs_seen:
                 self._pipe_xs_seen.add(key)
@@ -180,45 +182,45 @@ class FlappyBirdEnv(gym.Env):
                 pygame.quit()
                 sys.exit()
 
-        if self.active and self.steps_since_last_obstacle >= 120:
-            Pipe([self.all_sprites, self.collision_sprites], self.scale_factor * 1.1)
-            self.steps_since_last_obstacle = 0
-
-        self.steps_since_last_obstacle += 1
-
         dt = 1.0 / self.render_fps
-        self.all_sprites.update(dt)
-        if self.render_mode == "human":
-            self.display_surface.fill('black')
-            self.all_sprites.draw(self.display_surface)
+        self.time_since_last_obstacle += dt
 
-        # Check how many pipes were cleared before collision check kills the plane
+        # Use seconds so spawn rate matches human_play regardless of render_fps
+        if self.active and self.time_since_last_obstacle >= (200 / 120):
+            Pipe([self.all_sprites, self.collision_sprites], self.scale_factor * 1.1)
+            self.time_since_last_obstacle = 0.0
+        self.all_sprites.update(dt)
+
+        # Count pipes and update score before rendering so the HUD is always current
         pipes_passed = self._count_cleared_pipes()
 
         # Check collisions
         hit = pygame.sprite.spritecollide(
             self.plane, self.collision_sprites, False, pygame.sprite.collide_mask
         )
-        if hit or self.plane.rect.top <= 0:
+        if hit or self.plane.rect.top <= 0 or self.plane.rect.bottom >= WINDOW_HEIGHT:
             for sprite in self.collision_sprites.sprites():
                 if hasattr(sprite, 'sprite_type') and sprite.sprite_type == 'obstacle':
                     sprite.kill()
             self.active = False
             self.plane.kill()
 
-        # Score = pipes cleared (meaningful regardless of rendering speed)
         if pipes_passed:
             self.pipes_cleared += pipes_passed
         self.score = self.pipes_cleared
         self.frame_count += 1
 
+        if self.render_mode == "human":
+            self.display_surface.fill('black')
+            self.all_sprites.draw(self.display_surface)
+            score_surf = self._hud_font.render(str(self.score), True, 'white')
+            self.display_surface.blit(score_surf, score_surf.get_rect(midtop=(WINDOW_WIDTH // 2, 15)))
+            pygame.display.update()
+            self.clock.tick(self.render_fps)
+
         reward = self._get_reward(pipes_passed)
         state = self._get_state()
         done = not self.active
-
-        if self.render_mode == "human":
-            pygame.display.update()
-            self.clock.tick(self.render_fps)
 
         return state, reward, done, False, {"score": self.score, "frame": self.frame_count}
 

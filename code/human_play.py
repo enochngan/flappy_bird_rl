@@ -25,10 +25,8 @@ def run():
     def setup():
         all_sprites = pygame.sprite.Group()
         collision_sprites = pygame.sprite.Group()
-        bg_height = pygame.image.load('../graphics/environment/background.png').get_height()
-        scale_factor = WINDOW_HEIGHT / bg_height
+        scale_factor = WINDOW_HEIGHT / 480
         BG(all_sprites, scale_factor)
-        Ground([all_sprites, collision_sprites], scale_factor)
         plane = Plane(all_sprites, scale_factor / 1.7)
         return all_sprites, collision_sprites, plane, scale_factor
 
@@ -36,8 +34,8 @@ def run():
 
     score = 0
     best_score = 0
-    start_ticks = pygame.time.get_ticks()
     steps_since_pipe = 0
+    pipes_seen = set()
     alive = True
     started = False  # wait for first flap before gravity kicks in
 
@@ -54,8 +52,8 @@ def run():
                     # restart
                     all_sprites, collision_sprites, plane, scale_factor = setup()
                     score = 0
-                    start_ticks = pygame.time.get_ticks()
                     steps_since_pipe = 0
+                    pipes_seen = set()
                     alive = True
                     started = False
                 else:
@@ -67,7 +65,7 @@ def run():
                 plane.jump()
 
             # Spawn pipes
-            if steps_since_pipe >= 120:
+            if steps_since_pipe >= 200:
                 Pipe([all_sprites, collision_sprites], scale_factor * 1.1)
                 steps_since_pipe = 0
             steps_since_pipe += 1
@@ -77,11 +75,16 @@ def run():
 
             # Collision
             hit = pygame.sprite.spritecollide(plane, collision_sprites, False, pygame.sprite.collide_mask)
-            if hit or plane.rect.top <= 0:
+            if hit or plane.rect.top <= 0 or plane.rect.bottom >= WINDOW_HEIGHT:
                 alive = False
                 best_score = max(best_score, score)
 
-            score = (pygame.time.get_ticks() - start_ticks) // 100
+            # Count pipes the bird has passed
+            for s in collision_sprites:
+                if getattr(s, 'counts_for_score', False):
+                    if s.rect.right < plane.rect.centerx and id(s) not in pipes_seen:
+                        pipes_seen.add(id(s))
+                        score += 1
 
         elif alive and not started:
             # Only scroll BG/ground before first flap, freeze plane
