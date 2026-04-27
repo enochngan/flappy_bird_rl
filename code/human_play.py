@@ -74,7 +74,11 @@ def run():
             all_sprites.update(dt)
 
             # Collision
-            hit = pygame.sprite.spritecollide(plane, collision_sprites, False, pygame.sprite.collide_mask)
+            bird_hitbox = plane.rect.inflate(-20, -15)
+            hit = pygame.sprite.spritecollide(
+                plane, collision_sprites, False,
+                lambda p, obs: bird_hitbox.colliderect(obs.rect)
+            )
             if hit or plane.rect.top <= 0 or plane.rect.bottom >= WINDOW_HEIGHT:
                 alive = False
                 best_score = max(best_score, score)
@@ -82,8 +86,8 @@ def run():
             # Count pipes the bird has passed
             for s in collision_sprites:
                 if getattr(s, 'counts_for_score', False):
-                    if s.rect.right < plane.rect.centerx and id(s) not in pipes_seen:
-                        pipes_seen.add(id(s))
+                    if s.rect.right < plane.rect.centerx and s.pipe_id not in pipes_seen:
+                        pipes_seen.add(s.pipe_id)
                         score += 1
 
         elif alive and not started:

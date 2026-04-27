@@ -141,7 +141,7 @@ class FlappyBirdEnv(gym.Env):
         for obs in obstacles:
             if not getattr(obs, 'counts_for_score', False):
                 continue
-            key = id(obs)
+            key = obs.pipe_id   # stable unique int, never reused unlike id()
             if obs.rect.right < self.plane.rect.centerx and key not in self._pipe_xs_seen:
                 self._pipe_xs_seen.add(key)
                 bonus += 1
@@ -194,11 +194,25 @@ class FlappyBirdEnv(gym.Env):
         # Count pipes and update score before rendering so the HUD is always current
         pipes_passed = self._count_cleared_pipes()
 
-        # Check collisions
+        # Check collisions using a shrunk bird hitbox to avoid false positives
+        # from the rotated image being larger than self.rect (rotozoom artifact).
+        bird_hitbox = self.plane.rect.inflate(-20, -15)
         hit = pygame.sprite.spritecollide(
-            self.plane, self.collision_sprites, False, pygame.sprite.collide_mask
+            self.plane, self.collision_sprites, False,
+            lambda plane, obs: bird_hitbox.colliderect(obs.rect)
         )
         if hit or self.plane.rect.top <= 0 or self.plane.rect.bottom >= WINDOW_HEIGHT:
+            if self.render_mode == "human":
+                cause = []
+                if hit:
+                    for h in hit:
+                        cause.append(f"pipe_collision(pipe_id={getattr(h,'pipe_id','?')} "
+                                     f"rect={h.rect} bird_rect={self.plane.rect})")
+                if self.plane.rect.top <= 0:
+                    cause.append(f"top_boundary(bird.top={self.plane.rect.top})")
+                if self.plane.rect.bottom >= WINDOW_HEIGHT:
+                    cause.append(f"bottom_boundary(bird.bottom={self.plane.rect.bottom})")
+                print(f"[DEATH] score={self.score} | cause: {' + '.join(cause)}")
             for sprite in self.collision_sprites.sprites():
                 if hasattr(sprite, 'sprite_type') and sprite.sprite_type == 'obstacle':
                     sprite.kill()

@@ -110,10 +110,14 @@ class Plane(pygame.sprite.Sprite):
 
 class Pipe(pygame.sprite.Sprite):
 	"""Bottom pipe. Always spawns a matching top pipe (PipePartner)."""
+	_next_id = 0  # class-level counter; never reuses values
+
 	def __init__(self, groups, scale_factor, x_start=None):
 		super().__init__(groups)
 		self.sprite_type = 'obstacle'
 		self.counts_for_score = True   # only bottom pipe scores
+		self.pipe_id = Pipe._next_id
+		Pipe._next_id += 1
 
 		gap_y = randint(int(WINDOW_HEIGHT * 0.25), int(WINDOW_HEIGHT * 0.75))
 		self.gap_height = 250
