@@ -123,3 +123,5 @@ flappy_bird_rl/
 
 
 ## AI Usage
+
+We used Generative AI to help draft the outline of the project. We utilized AI to help create psuedocode for our FlappyBird game and RL logic. 
